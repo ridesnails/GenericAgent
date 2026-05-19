@@ -55,27 +55,11 @@
   --switch-off:#cfd4de;
   --dot-idle:#c2c7d0;
 
-  /* —— 标注层 —— */
-  --annot-fg:#9a6b00;
-  --annot-bg:#fff7e6;
-  --annot-line:#e6c869;
-  --annot-tip-fg:#444444;
-  --annot-tip-bg:#fffbe9;
-  --region-line:#b9c2d6;
-  --region-tag:#5a76d8;
-
-  /* —— 悬浮开发按钮 —— */
-  --fab-fg:#e8ecf6;
-  --fab-bg:#1c202edb;
-  --fab-line:#ffffff24;
-
   /* —— 阴影 / 遮罩 —— */
   --overlay:#14192861;
   --shadow:0 1px 2px #1419280a, 0 8px 24px #1419280d;
   --shadow-pop:0 8px 24px #14192829;
   --shadow-modal:0 18px 50px #14192847;
-  --shadow-fab:0 6px 22px #14192847;
-  --shadow-fab-h:0 10px 28px #14192857;
 
   --radius:12px; --radius-sm:8px;
   font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
@@ -88,17 +72,6 @@ body{ background:var(--bg); color:var(--txt); font-size:13px; overflow:hidden; }
   width:100vw; height:100vh; background:var(--bg);
   overflow:hidden; display:flex; flex-direction:column;
 }
-
-/* ---- 世界之外的力量：标注模式悬浮按钮（非产品本体，开发用）---- */
-.annot-fab{
-  position:fixed; right:18px; bottom:18px; z-index:999;
-  font-size:12px; font-weight:600; letter-spacing:.3px;
-  padding:9px 16px; border-radius:22px; cursor:pointer;
-  color:var(--fab-fg); background:var(--fab-bg); border:1px solid var(--fab-line);
-  box-shadow:var(--shadow-fab); backdrop-filter:blur(4px);
-  transition:transform .12s, box-shadow .12s;
-}
-.annot-fab:hover{ transform:translateY(-1px); box-shadow:var(--shadow-fab-h); }
 
 /* ---- 弹窗（添加模型 / 配置）---- */
 .chip.add-model{ padding:5px 8px; }
@@ -426,35 +399,3 @@ body{ background:var(--bg); color:var(--txt); font-size:13px; overflow:hidden; }
 .ctx-item:hover{ background:var(--line-soft); }
 .ctx-item.danger{ color:var(--danger); }
 .ctx-item.danger:hover{ background:var(--danger-bg); }
-
-/* ============ 标注层 ============ */
-.annot-inline{
-  display:none; font-size:11px; color:var(--annot-fg); background:var(--annot-bg);
-  border:1px dashed var(--annot-line); border-radius:8px; padding:8px 10px;
-  line-height:1.55; max-width:280px;
-}
-#app.annot-on .annot-inline{ display:block; }
-
-#app.annot-on [data-region]{ position:relative; outline:1.5px dashed var(--region-line); outline-offset:-2px; }
-#app.annot-on [data-region]::before{
-  content:attr(data-region); position:absolute; top:0; left:0; z-index:9;
-  font-size:10px; font-weight:700; color:var(--on-accent); background:var(--region-tag);
-  padding:2px 8px; border-bottom-right-radius:8px; max-width:96%;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-
-/* 悬停任意带 data-note 元素，显示「该放什么」气泡 */
-#app.annot-on [data-note]{ position:relative; }
-#app.annot-on [data-note]:hover::after{
-  content:attr(data-note); position:absolute; left:0; top:100%; z-index:50;
-  margin-top:4px; width:220px; max-width:240px; font-size:11px; font-weight:400; color:var(--annot-tip-fg);
-  background:var(--annot-tip-bg); border:1px solid var(--annot-line); border-radius:8px;
-  padding:8px 10px; line-height:1.5; box-shadow:var(--shadow-pop);
-  white-space:normal;
-}
-/* 右侧/右上：往左弹，别超出窗口右边 */
-#app.annot-on .rightpanel [data-note]:hover::after,
-#app.annot-on .tb-right [data-note]:hover::after{ left:auto; right:0; }
-/* 底部区域：往上弹，别被窗口底裁掉 */
-#app.annot-on .sidebar-foot [data-note]:hover::after,
-#app.annot-on .composer [data-note]:hover::after{ top:auto; bottom:100%; margin:0 0 4px; }
