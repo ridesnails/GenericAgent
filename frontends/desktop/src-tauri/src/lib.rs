@@ -88,11 +88,13 @@ fn find_project_dir() -> Option<String> {
     None
 }
 
-/// Settings file path: ~/.ga_desktop_settings.json
+/// Settings file path: ~/.GenericAgent/ga_desktop_settings.json
 fn settings_path() -> PathBuf {
-    dirs::home_dir()
+    let dir = dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".ga_desktop_settings.json")
+        .join(".GenericAgent");
+    let _ = std::fs::create_dir_all(&dir);
+    dir.join("ga_desktop_settings.json")
 }
 
 /// Read config from settings file, or auto-discover and save
