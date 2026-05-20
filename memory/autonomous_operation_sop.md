@@ -1,15 +1,16 @@
 # 自主行动 SOP
 
-⚠️ **路径警告**：autonomous_reports 在 temp/ 下，用`./autonomous_reports/`访问，**不是**`../memory/autonomous_reports/`或`../autonomous_reports/`！TODO在cwd下。
+⚠️ **路径警告**：autonomous_reports 在 temp/ 下，用`./autonomous_reports/`访问，**不是**`../memory/autonomous_reports/`或`../autonomous_reports/`！TODO在cwd下，常见为`./TODO.txt`，**必须以 `set_todo()` 返回为准，不要猜 `TODO.md`**。
 报告存于 `./autonomous_reports/`，文件名 `RXX_简短描述.md`（XX从 history.txt 推断自增）。
 
 授权你进行自主行动，只要不对环境造成副作用都可进行。
 
 ## 启动（第一步）
-- update_working_checkpoint: `自主行动｜收尾时重读SOP | from autonomous_operation_sop.helper import *; set_todo()/complete_task(tasktitle, historyline, report_path)`
+- update_working_checkpoint: `自主行动｜收尾时重读SOP | helper 默认不一定在 sys.path；必要时按 ../memory/autonomous_operation_sop/helper.py 导入 | set_todo()/complete_task(tasktitle, historyline, report_path)`
 
 第二步：
 ```python
+# 若 `from autonomous_operation_sop.helper import *` 失败，直接按真实文件路径导入 helper
 from autonomous_operation_sop.helper import *
 print(get_history(40))  # 了解历史避免重复
 print(get_todo())       # 查看待办
@@ -17,6 +18,7 @@ print(get_todo())       # 查看待办
 
 ## 任务选择
 - 有未完成条目 → 取**一条**，直接进入执行，其他条目下次执行
+- 若 TODO 条目与 history/既有 R 报告疑似重复，先核对对应 history 行和 `autonomous_reports/R*.md`；确认重复后不要重做，改为写纠偏报告，并在收尾时将重复待办标记为已完成
 - 无 TODO → 读 `autonomous_operation_sop/task_planning.md` 规划，下次执行
 - 不连续两次选相同子任务
 - 价值公式：**「AI训练数据无法覆盖」×「对未来协作有持久收益」**
