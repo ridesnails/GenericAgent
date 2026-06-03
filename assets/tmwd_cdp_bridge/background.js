@@ -215,22 +215,34 @@ const WS_URL = 'ws://127.0.0.1:18765';
 
 function scheduleProbe() {
   // Use chrome.alarms to survive MV3 service worker suspension
-  chrome.alarms.create('tmwd-ws-probe', { delayInMinutes: 0.083 }); // ~5s
+  chrome.alarms.create('tmwd-ws-probe', { delayInMinutes: 0.5 }); // Chrome MV3 minimum: 30s
 }
 
 function scheduleKeepalive() {
   // Keep SW alive while WS is connected (~25s, under 30s SW timeout)
-  chrome.alarms.create('tmwd-ws-keepalive', { delayInMinutes: 0.4 }); // ~24s
+  chrome.alarms.create('tmwd-ws-keepalive', { delayInMinutes: 0.5 }); // Chrome MV3 minimum: 30s
 }
 
 async function isServerAlive() {
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 2000);
   try {
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 2000);
     await fetch('http://127.0.0.1:18765', { signal: ctrl.signal });
     return true; // Got HTTP response → port is listening
   } catch (e) {
     return false; // Network error (connection refused) or timeout → server not alive
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function probeAndConnectWS() {
+  if (ws && ws.readyState <= 1) return;
+  if (await isServerAlive()) {
+    console.log('[TMWD-WS] Server detected, connecting...');
+    connectWS();
+  } else {
+    scheduleProbe();
   }
 }
 
@@ -251,13 +263,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
   }
   if (alarm.name === 'tmwd-ws-probe') {
-    if (ws && ws.readyState <= 1) return; // Already connected/connecting
-    if (await isServerAlive()) {
-      console.log('[TMWD-WS] Server detected, connecting...');
-      connectWS();
-    } else {
-      scheduleProbe(); // Server not up, keep probing
-    }
+    probeAndConnectWS();
   }
 });
 
@@ -394,10 +400,11 @@ function connectWS() {
   };
 }
 
-// Initial connect + wake-up hooks
-connectWS();
-chrome.runtime.onStartup.addListener(() => connectWS());
-chrome.runtime.onInstalled.addListener(() => connectWS());
+// Initial connect + wake-up hooks. Probe first so Chrome does not report
+// connection-refused errors while TMWebDriver/GA is not running.
+probeAndConnectWS();
+chrome.runtime.onStartup.addListener(() => probeAndConnectWS());
+chrome.runtime.onInstalled.addListener(() => probeAndConnectWS());
 
 // Sync tab list on changes
 async function sendTabsUpdate() {

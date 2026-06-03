@@ -1,0 +1,12 @@
+{
+  "sessions": [
+    {
+      "id": "09d8569b",
+      "created_at": "2026-05-08T10:25:26.902261Z",
+      "updated_at": "2026-05-08T10:53:33.470982Z",
+      "model": "MiniMax-M2.7",
+      "summary": "查看当前项目的状态",
+      "message_count": 74
+    }
+  ]
+}
