@@ -10,6 +10,7 @@
 
 <p>
 
+  <a href="https://gaagent.ai"><img src="https://img.shields.io/badge/Official_Website-gaagent.ai-00A67E?style=flat-square" alt="Official Website"/></a>
   <a href="https://arxiv.org/abs/2604.17091"><img src="https://img.shields.io/badge/Technical_Report-PDF-EA4335?style=flat-square&logo=adobeacrobatreader&logoColor=white" alt="Technical Report"/></a>
   <a href="https://github.com/JinyiHan99/GA-Technical-Report"><img src="https://img.shields.io/badge/Code_%26_Data-Reproduction-181717?style=flat-square&logo=github" alt="Reproduction Repo"/></a>
   <a href="https://datawhalechina.github.io/hello-generic-agent/"><img src="https://img.shields.io/badge/Tutorial-Datawhale-blue?style=flat-square" alt="Tutorial"/></a>
@@ -24,8 +25,7 @@
 
 </div>
 
-> 📌 **Official Channel** — This GitHub repository is the **only** official source of GenericAgent.
-> We have no affiliation with any third-party website using the GenericAgent name.
+> 📌 **Official:** GitHub + https://gaagent.ai only. DintalClaw is the sole authorized commercial partner; others are not affiliated.
 
 ---
 
@@ -47,6 +47,7 @@ Every time GenericAgent solves a new task, it automatically crystallizes the exe
 - [Demo Showcase](#-demo-showcase)
 - [Quick Start](#-quick-start)
 - [Usage](#-usage)
+- [Unlocking Advanced Capabilities](#-unlocking-advanced-capabilities)
 - [Architecture](#-architecture)
 - [Self-Evolution Mechanism](#-self-evolution-mechanism)
 - [Comparison](#-comparison)
@@ -73,8 +74,20 @@ Every time GenericAgent solves a new task, it automatically crystallizes the exe
 
 <table>
   <tr>
-    <td align="center" width="50%"><b>🧋 Food Delivery Order</b></td>
-    <td align="center" width="50%"><b>📈 Quantitative Stock Screening</b></td>
+    <td align="center" width="50%"><b>🛡️ Real-Browser CAPTCHA Survival</b></td>
+    <td align="center" width="50%"><b>🌐 Autonomous Web Exploration</b></td>
+  </tr>
+  <tr>
+    <td><img src="assets/demo/discord_hcaptcha_real_browser.gif" width="100%" alt="Discord hCaptcha passed in real browser"></td>
+    <td><img src="assets/demo/autonomous_explore.png" width="100%" alt="Web Exploration"></td>
+  </tr>
+  <tr>
+    <td><sub>While configuring a Discord bot, an hCaptcha <i>"Are you human?"</i> challenge pops up mid-task — GA's real browser session passes it and the task continues. See <a href="#browser-realness-of-ga-web-tools">Browser Realness</a>.</sub></td>
+    <td><sub>Autonomously browses and periodically summarizes web content.</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><b>🧋 Food Delivery Order</b></td>
+    <td align="center"><b>📈 Quantitative Stock Screening</b></td>
   </tr>
   <tr>
     <td><img src="assets/demo/order_tea.gif" width="100%" alt="Order Tea"></td>
@@ -85,25 +98,16 @@ Every time GenericAgent solves a new task, it automatically crystallizes the exe
     <td><sub><i>"Find GEM stocks with EXPMA golden cross, turnover &gt; 5%"</i> — quantitative screening.</sub></td>
   </tr>
   <tr>
-    <td align="center"><b>🌐 Autonomous Web Exploration</b></td>
     <td align="center"><b>💰 Expense Tracking</b></td>
+    <td align="center"><b>💬 Batch Messaging</b></td>
   </tr>
   <tr>
-    <td><img src="assets/demo/autonomous_explore.png" width="100%" alt="Web Exploration"></td>
     <td><img src="assets/demo/alipay_expense.png" width="100%" alt="Alipay Expense"></td>
+    <td align="center"><img src="assets/demo/wechat_batch.png" width="65%" alt="WeChat Batch"></td>
   </tr>
   <tr>
-    <td><sub>Autonomously browses and periodically summarizes web content.</sub></td>
     <td><sub><i>"Find expenses over ¥2K in the last 3 months"</i> — drives Alipay via ADB.</sub></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2"><b>💬 Batch Messaging</b></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="assets/demo/wechat_batch.png" width="50%" alt="WeChat Batch"></td>
-  </tr>
-  <tr>
-    <td colspan="2"><sub>Sends bulk WeChat messages, fully driving the WeChat client.</sub></td>
+    <td><sub>Sends bulk WeChat messages, fully driving the WeChat client.</sub></td>
   </tr>
 </table>
 
@@ -141,26 +145,21 @@ powershell -ExecutionPolicy Bypass -c "$env:GLOBAL=1; irm http://fudankw.cn:9000
 GLOBAL=1 bash -c "$(curl -fsSL http://fudankw.cn:9000/files/ga_install.sh)"
 ```
 
-After installation, launch the desktop app from:
+After installation, launch the desktop app:
 
-```text
-frontends/GenericAgent.exe
-```
+- **Windows** — double-click `frontends/GenericAgent.exe`
+- **Linux / macOS** — run `python launch.pyw` from the install directory
 
 #### Method 2 — Python install *(for developers)*
 
 ```bash
-git clone https://github.com/lsdefine/GenericAgent.git
-cd GenericAgent
-uv venv
-uv pip install -e ".[ui]"          # Core + UI dependencies
-cp mykey_template.py mykey.py      # Fill in your LLM API key
+git clone https://github.com/lsdefine/GenericAgent.git && cd GenericAgent
+uv venv && uv pip install -e ".[ui]"
+cp mykey_template_en.py mykey.py   # fill in your LLM API key
 python launch.pyw
 ```
 
-> 💡 GenericAgent is meant to grow its environment **through the Agent itself**, not by pre-installing every possible package.
-
-📖 Full guide: [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md)
+> 💡 GenericAgent grows its environment **through the Agent itself** — don't pre-install everything. See [Unlocking Advanced Capabilities](#-unlocking-advanced-capabilities) below.
 
 ---
 
@@ -204,26 +203,41 @@ python launch.pyw
 
 ### Bot Interface (IM)
 
-GenericAgent also supports IM frontends such as Telegram, WeChat, QQ, Feishu / Lark, WeCom, and DingTalk.
+GenericAgent also supports IM frontends such as Telegram, Discord, and Lark.
 
 | Platform | Command |
 | :--- | :--- |
 | Telegram | `python frontends/tgapp.py` |
-| WeChat | `python frontends/wechatapp.py` |
-| QQ | `python frontends/qqapp.py` |
-| Feishu / Lark | `python frontends/fsapp.py` |
-| WeCom | `python frontends/wecomapp.py` |
-| DingTalk | `python frontends/dingtalkapp.py` |
+| Discord | `python frontends/dcapp.py` |
+| Lark / Feishu | `python frontends/fsapp.py` |
 
+> WeChat, QQ, WeCom and DingTalk are also supported — see the Chinese section below.
 > For detailed setup, ask GenericAgent itself.
 
-### Common Chat Commands
+---
 
-| Command | Description |
+## 🔓 Unlocking Advanced Capabilities
+
+In GA, advanced capabilities are unlocked by **instructing the agent**, not by reading
+docs or installing extras. Each instruction below makes GA read its pre-installed SOPs
+(battle-tested playbooks in its memory), install whatever is missing, adapt to your OS,
+and persist the result into its own memory.
+
+| Capability | Just tell GA |
 | :--- | :--- |
-| `/new` | Start a fresh conversation and clear the current context |
-| `/continue` | List recoverable conversation snapshots |
-| `/continue N` | Restore the `N`-th recoverable conversation |
+| 🌐 Web automation | *"Set up your web automation capability."* — GA guides you through the one manual step: dragging the bundled Chrome extension into `chrome://extensions`. |
+| 🔤 OCR | *"Set up your OCR capability with rapidocr and save it to memory."* |
+| 👁️ Vision | *"Set up your vision capability from the template in memory/."* — GA copies the template, wires it to your existing LLM keys, and self-tests. |
+| 🖱️ Computer use | *"Probe this system and set up your computer-use capability."* |
+
+> 💡 **About language**: the pre-installed SOPs are written in Chinese — GA reads them
+> natively, so this never blocks you. If you prefer an English knowledge base, just say:
+> *"Read your pre-installed SOPs and rewrite them in English (keep code, paths and error
+> strings verbatim)."*
+>
+> 🌍 **About platforms**: the SOPs were honed on Windows, but cross-platform adaptation is
+> itself a GA task — on macOS/Linux, GA swaps in the platform equivalents (window
+> enumeration, input control, screenshots) on its own. Same self-evolution principle.
 
 ---
 
@@ -298,6 +312,7 @@ This is what fundamentally distinguishes GenericAgent from every other agent fra
 | What you say | First time | Every time after |
 | :--- | :--- | :--- |
 | *"Read my WeChat messages"* | Install deps → reverse DB → write read script → save Skill | **one-line invoke** |
+| *"Give me a morning digest of Hacker News"* | Write scraper → build digest → schedule daily run → save Skill | **one-line invoke** |
 | *"Monitor stocks and alert me"* | Install `mootdx` → build selection flow → configure cron → save Skill | **one-line start** |
 | *"Send this file via Gmail"* | Configure OAuth → write send script → save Skill | **ready to use** |
 
@@ -347,6 +362,21 @@ Baselines across these dimensions include **Claude Code**, **OpenAI CodeX**, and
   </tr>
 </table>
 
+### Browser Realness of GA Web Tools
+
+GA web tools run through a **real, persistent Chrome/Chromium session** rather than a disposable headless sandbox, preserving cookies, login state, extensions, GPU/WebGL behavior, and normal browser-session fingerprints.
+
+| Detection Service / Signal | Vanilla Headless Automation | GA Web Tools | Notes |
+| :--- | :---: | :---: | :--- |
+| SannySoft headless test | Often detected | ✅ 56/56 passed | `bot.sannysoft.com` |
+| bot.incolumitas.com | Commonly fails webdriver / CDP checks | ✅ 36/36 passed | `WEBDRIVER`, `SELENIUM_DRIVER`, `webDriverAdvanced` all OK |
+| BrowserScan bot detection | Often abnormal | ✅ Normal | `browserscan.net` |
+| Device & Browser Info bot test | Multiple bot flags | ✅ Human / `isBot=false` | `deviceandbrowserinfo.com` |
+| FingerprintJS bot detection demo | Often detected | ✅ Passed | Demo flow completed without bot verdict |
+| reCAPTCHA v3 demo | Low bot-like score | ✅ 0.9 human-like score | Score-based risk signal; 0.9 is above typical production thresholds |
+
+For reCAPTCHA v3, `0.9` is not a "checkbox solved" result; it is the high-confidence human-like score returned by the risk model, typically sufficient to avoid extra challenges in production flows.
+
 ---
 
 ## 📅 Roadmap & News
@@ -361,9 +391,9 @@ Baselines across these dimensions include **Claude Code**, **OpenAI CodeX**, and
 - **2026-04-21** — 📄 [**Technical Report on arXiv**](https://arxiv.org/abs/2604.17091) — *GenericAgent: A Token-Efficient Self-Evolving LLM Agent via Contextual Information Density Maximization*.
 - **2026-04-11** — Introduced **L4 session archive memory** and scheduler cron integration.
 - **2026-03-23** — Personal WeChat supported as a bot frontend.
-- **2026-03-10** — [Released million-scale Skill Library](https://mp.weixin.qq.com/s/q2gQ7YvWoiAcwxzaiwpuiQ?scene=1&click_id=7).
-- **2026-03-08** — [Released "Dintal Claw" — a GenericAgent-powered government-affairs bot](https://mp.weixin.qq.com/s/eiEhwo-j6S-WpLxgBnNxBg).
-- **2026-03-01** — [Featured by Jiqizhixin (机器之心)](https://mp.weixin.qq.com/s/uVWpTTF5I1yzAENV_qm7yg).
+- **2026-03-10** — [Released million-scale Skill Library](https://mp.weixin.qq.com/s/q2gQ7YvWoiAcwxzaiwpuiQ?scene=1&click_id=7) *(Chinese)*.
+- **2026-03-08** — [Released "Dintal Claw" — a GenericAgent-powered government-affairs bot](https://mp.weixin.qq.com/s/eiEhwo-j6S-WpLxgBnNxBg) *(Chinese)*.
+- **2026-03-01** — [Featured by Jiqizhixin (机器之心)](https://mp.weixin.qq.com/s/uVWpTTF5I1yzAENV_qm7yg) *(Chinese)*.
 - **2026-01-16** — GenericAgent **V1.0** public release.
 
 ---
@@ -371,16 +401,6 @@ Baselines across these dimensions include **Claude Code**, **OpenAI CodeX**, and
 ## ⭐ Community & Support
 
 If this project helped you, please consider leaving a **Star!** 🙏
-
-You're also welcome to join the **GenericAgent Community Group** for discussion, feedback, and co-building 👏
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center"><strong>WeChat Group 21</strong><br/><img src="assets/images/wechat_group21.jpg" alt="WeChat Group 21 QR" width="240"/></td>
-    </tr>
-  </table>
-</div>
 
 ### 🚩 Friendly Links
 
@@ -393,6 +413,7 @@ Thanks to the **LinuxDo** community for the support!
 - [chilishark27/ga-manager](https://github.com/chilishark27/ga-manager)
 - [wangjc683/galley](https://github.com/wangjc683/galley) — Out-of-the-box local agent workbench with a bundled GA runtime (CPython 3.11 + deps), native GUI/CLI, multi-session + Project orchestration, local-first.
 - [FroStorM/A3Agent](https://github.com/FroStorM/A3Agent/tree/workbench)
+- [Fwind43/GenericAgent-Admin](https://github.com/Fwind43/GenericAgent-Admin) — Go + React desktop admin panel: service lifecycle management, native chat, Goal mode, BBS team board, file editor, model config wizard, TMWebDriver monitor, self-update, and Windows tray/desktop-pet integration.
 
 ---
 
@@ -400,7 +421,7 @@ Thanks to the **LinuxDo** community for the support!
 
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for full text.
 
-> *Disclaimer: This project does not build or operate any commercial website. Apart from DintalClaw, no institution, organization, or individual is currently officially authorized to conduct commercial activities under the GenericAgent name.*
+> *Disclaimer: The official GenericAgent channels are this GitHub repository and https://gaagent.ai. DintalClaw is currently the only officially authorized commercial partner; any other third-party website, organization, or individual using the GenericAgent name is not official unless explicitly listed here.*
 
 ---
 
@@ -516,11 +537,10 @@ powershell -ExecutionPolicy Bypass -c "irm http://fudankw.cn:9000/files/ga_insta
 curl -fsSL http://fudankw.cn:9000/files/ga_install.sh | bash
 ```
 
-安装完成后，双击启动：
+安装完成后启动：
 
-```text
-frontends/GenericAgent.exe
-```
+- **Windows** — 双击 `frontends/GenericAgent.exe`
+- **Linux / macOS** — 在安装目录运行 `python launch.pyw`
 
 #### 方法二 — Python 安装 *（开发者）*
 
@@ -547,7 +567,7 @@ python launch.pyw
 
 #### 桌面端
 
-一键安装自带桌面端，双击：
+一键安装自带桌面端（Windows），双击：
 
 ```text
 frontends/GenericAgent.exe
@@ -579,11 +599,12 @@ python launch.pyw
 
 ### Bot 接口（IM）
 
-GenericAgent 支持 Telegram、微信、QQ、飞书 / Lark、企业微信、钉钉等 IM 前端。
+GenericAgent 支持 Telegram、Discord、微信、QQ、飞书 / Lark、企业微信、钉钉等 IM 前端。
 
 | 平台 | 启动命令 |
 | :--- | :--- |
 | Telegram | `python frontends/tgapp.py` |
+| Discord | `python frontends/dcapp.py` |
 | 微信 | `python frontends/wechatapp.py` |
 | QQ | `python frontends/qqapp.py` |
 | 飞书 / Lark | `python frontends/fsapp.py` |
@@ -591,14 +612,6 @@ GenericAgent 支持 Telegram、微信、QQ、飞书 / Lark、企业微信、钉�
 | 钉钉 | `python frontends/dingtalkapp.py` |
 
 > 详细配置直接问 GenericAgent。
-
-### 通用聊天命令
-
-| 命令 | 说明 |
-| :--- | :--- |
-| `/new` | 开启新对话并清空当前上下文 |
-| `/continue` | 列出可恢复会话快照 |
-| `/continue N` | 恢复第 `N` 个可恢复会话 |
 
 ---
 
@@ -721,6 +734,21 @@ GenericAgent 通过 **分层记忆 × 最小工具集 × 自主执行循环** �
   </tr>
 </table>
 
+### GA Web 工具的浏览器真实性
+
+GA Web 工具运行在**真实、持久化的 Chrome/Chromium 会话**中，而不是一次性的 headless 沙箱，因此可以保留 Cookie、登录态、扩展、GPU/WebGL 行为以及正常浏览器会话指纹。
+
+| 检测服务 / 信号 | 普通 Headless 自动化 | GA Web 工具 | 说明 |
+| :--- | :---: | :---: | :--- |
+| SannySoft headless test | 常被识别 | ✅ 56/56 通过 | `bot.sannysoft.com` |
+| bot.incolumitas.com | 常在 webdriver / CDP 项异常 | ✅ 36/36 通过 | `WEBDRIVER`、`SELENIUM_DRIVER`、`webDriverAdvanced` 全部 OK |
+| BrowserScan bot detection | 常显示异常 | ✅ Normal | `browserscan.net` |
+| Device & Browser Info bot test | 多个 bot 标记 | ✅ Human / `isBot=false` | `deviceandbrowserinfo.com` |
+| FingerprintJS bot detection demo | 常被识别 | ✅ 通过 | Demo 流程完成，未给出 bot 判定 |
+| reCAPTCHA v3 demo | 低分 / bot-like | ✅ 0.9 真人相似分 | v3 是基于分数的风险信号；0.9 高于常见生产阈值 |
+
+对于 reCAPTCHA v3，`0.9` 不是“点过验证码”的结果，而是风控模型返回的高置信真人相似分，通常足以通过生产环境中的常见阈值，避免进入更严格挑战。
+
 ---
 
 ## 📅 路线图与最新动态
@@ -767,6 +795,7 @@ GenericAgent 通过 **分层记忆 × 最小工具集 × 自主执行循环** �
 - [chilishark27/ga-manager](https://github.com/chilishark27/ga-manager)
 - [wangjc683/galley](https://github.com/wangjc683/galley) —— 开箱即用的本地 Agent 工作台，自带 GA 内核（内置 CPython 3.11 + 运行依赖），GUI/CLI 双原生、多 session + Project 编排、本地优先。
 - [FroStorM/A3Agent](https://github.com/FroStorM/A3Agent/tree/workbench)
+- [Fwind43/GenericAgent-Admin](https://github.com/Fwind43/GenericAgent-Admin) —— Go + React 桌面管理面板：服务生命周期管理、原生 Chat、Goal 模式、BBS 团队看板、文件编辑器、模型配置向导、TMWebDriver 监控、自更新，以及 Windows 托盘/桌面宠物集成。
 
 ---
 
@@ -774,7 +803,7 @@ GenericAgent 通过 **分层记忆 × 最小工具集 × 自主执行循环** �
 
 基于 **MIT License** 发布，详见 [`LICENSE`](LICENSE)。
 
-> *声明：本项目未构建任何商业站点；除 DintalClaw 外，目前未官方授权任何机构、组织或个人以 GenericAgent 名义从事商业活动。*
+> *声明：GenericAgent 官方渠道为本 GitHub 仓库和 https://gaagent.ai。DintalClaw 是目前唯一官方授权的商业合作方；除非在此处明确列出，其他使用 GenericAgent 名义的第三方网站、机构、组织或个人均非官方。*
 
 ---
 
