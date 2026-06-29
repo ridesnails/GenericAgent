@@ -1,3 +1,11 @@
+---
+skill: scheduled_task
+domain: system
+version: "1.0"
+tags: [schedule, cron, task, automation]
+cc_quick: "定时任务系统 — JSON定义/自动执行/历史报告管理"
+cc_keywords: ["定时任务", "schedule", "自动执行", "任务调度"]
+---
 # 定时任务 SOP
 
 目录：`../sche_tasks/` 放任务定义JSON，`../sche_tasks/done/` 放执行报告

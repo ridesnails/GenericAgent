@@ -1,4 +1,4 @@
-import os, json, time as _time, socket as _socket, logging
+import os, json, time as _time, socket as _socket, logging, re, subprocess
 from datetime import datetime, timedelta
 
 # 端口锁：防止重复启动，bind失败时agentmain会直接崩溃退出
@@ -129,3 +129,85 @@ def check():
                 f'完成后将执行报告写入 {rpt}。')
 
     return None
+
+
+def _extract_report_path(text):
+    match = re.search(r'\[报告路径\]\s*(.+)', text or '')
+    if match:
+        path = match.group(1).strip()
+        if path and os.path.exists(path):
+            return path
+    # Fallback: latest recently written scheduler report.
+    try:
+        files = [os.path.join(DONE, f) for f in os.listdir(DONE) if f.endswith('.md')]
+        files = [p for p in files if os.path.isfile(p)]
+        files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        if files and (_time.time() - os.path.getmtime(files[0])) < 3600:
+            return files[0]
+    except Exception as e:
+        _logger.error(f'find latest report failed: {e}')
+    return None
+
+
+def _short_text(text, limit=3600):
+    text = (text or '').strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit - 80].rstrip() + '\n\n...[truncated, see attached report if available]'
+
+
+def _telegram_notify(text, report_path=None):
+    root = os.path.abspath(os.path.join(_dir, '..'))
+    pybin = '/opt/homebrew/bin/python3'
+    if not os.path.exists(pybin):
+        _logger.warning(f'Telegram notify skipped: {pybin} not found')
+        return
+    payload = json.dumps({'text': text or '', 'report_path': report_path or '', 'root': root}, ensure_ascii=False)
+    script = r'''
+import os, sys, json, asyncio
+payload = json.loads(sys.stdin.read())
+root = payload.get('root') or os.getcwd()
+for p in (root, os.path.join(root, 'frontends')):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+from llmcore import mykeys
+from telegram import Bot
+
+def short_text(text, limit=3600):
+    text = (text or '').strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit - 80].rstrip() + '\n\n...[truncated, see attached report if available]'
+
+async def main():
+    token = mykeys.get('tg_bot_token')
+    chat_ids = mykeys.get('tg_allowed_users', []) or []
+    if not token or not chat_ids:
+        print('missing telegram config')
+        return
+    bot = Bot(token=token)
+    report_path = payload.get('report_path') or ''
+    body = '✅ GenericAgent 定时任务完成\n\n' + short_text(payload.get('text') or '')
+    for chat_id in chat_ids:
+        await bot.send_message(chat_id=chat_id, text=body, disable_web_page_preview=True)
+        if report_path and os.path.exists(report_path):
+            with open(report_path, 'rb') as fp:
+                await bot.send_document(chat_id=chat_id, document=fp, filename=os.path.basename(report_path), caption='定时任务报告')
+    print(f'sent to {len(chat_ids)} chat(s); report={bool(report_path and os.path.exists(report_path))}')
+asyncio.run(main())
+'''
+    cp = subprocess.run([pybin, '-c', script], input=payload, text=True, cwd=root,
+                        capture_output=True, timeout=120)
+    if cp.returncode != 0:
+        raise RuntimeError((cp.stderr or cp.stdout or '').strip() or f'notify subprocess rc={cp.returncode}')
+    _logger.info('Telegram notify subprocess: ' + (cp.stdout.strip() or 'ok'))
+
+
+def on_done(result):
+    """Reflect hook: push completed scheduler result to the existing Telegram bot."""
+    report_path = _extract_report_path(result)
+    try:
+        _telegram_notify(result, report_path=report_path)
+        _logger.info(f'Telegram notify sent report={report_path or "<none>"}')
+    except Exception as e:
+        _logger.error(f'Telegram notify failed: {type(e).__name__}: {e}')
