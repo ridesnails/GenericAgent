@@ -5,6 +5,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
+.venv*/
 venv/
 env/
 build/
@@ -12,6 +13,10 @@ dist/
 *.egg-info/
 
 .streamlit/
+.serena/
+
+# Local model artifacts are large and should not enter normal Git objects.
+models/
 
 .vscode/
 .idea/
@@ -149,3 +154,17 @@ frontends/conductor_im_plugins/*
 
 # 本地 bug / 局限报告草稿（交给维护者参考，不进仓库）
 /BUG_*.md
+
+.ace-tool/
+
+# Upstream-sync backups & local bak snapshots (large, local-only)
+.backup_upstream_sync_*/
+*.bak_*
+mykey.py.bak*
+
+# Snow / local tooling state
+.snow/
+
+# claude-max-proxy runtime logs & captures (keep proxy.py & mapping)
+claude-max-proxy/proxy.log
+claude-max-proxy/captures/
