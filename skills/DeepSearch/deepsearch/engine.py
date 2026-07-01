@@ -76,13 +76,21 @@ def scope(question: str) -> dict:
 # ---------- 阶段 2：Search ----------
 
 def _search_sub_query(tool: str, query: str) -> dict:
-    """针对单个子查询执行搜索。"""
+    """针对单个子查询执行搜索。
+
+    结果统一归一化为 dual_search 的嵌套结构
+    {grok:{content,citations}, tavily:{answer,results}}，
+    确保 verify/synthesize 能从所有节点（含单引擎节点）读取内容。
+    错误结果保留顶层 {"error": ...}，便于上层短路处理。
+    """
     q = query
     if tool == "tavily_search":
-        return _run_script("tavily_search.py", "--query", q, "--depth", "basic", "--max-results", "8")
+        r = _run_script("tavily_search.py", "--query", q, "--depth", "basic", "--max-results", "8")
+        return r if "error" in r else {"grok": {}, "tavily": r}
     if tool == "grok_search":
-        return _run_script("grok_search.py", "--query", q)
-    # default: dual_search
+        r = _run_script("grok_search.py", "--query", q)
+        return r if "error" in r else {"grok": r, "tavily": {}}
+    # default: dual_search（已为嵌套结构）
     return _run_script("dual_search.py", "--query", q, "--max-results", "8")
 
 
@@ -164,14 +172,32 @@ def _fetch_url(url: str) -> dict:
 
 
 def fetch(urls: list[str]) -> list[dict]:
-    """抓取 URLs 内容。"""
-    pages = []
-    for url in urls:
-        print(f"  [fetch] {url[:70]}...", file=sys.stderr)
-        page = _fetch_url(url)
+    """抓取 URLs 内容（并行）。
+
+    并行执行（ThreadPoolExecutor），保持结果与 urls 原序；
+    单个 URL 失败或抓不到 markdown 的自动丢弃，不影响其他 URL。
+    """
+    if not urls:
+        return []
+
+    pages: list[dict | None] = [None] * len(urls)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        fut_to_idx = {ex.submit(_fetch_url, url): i for i, url in enumerate(urls)}
+        for fut in concurrent.futures.as_completed(fut_to_idx):
+            idx = fut_to_idx[fut]
+            try:
+                pages[idx] = fut.result()
+            except Exception as e:
+                pages[idx] = {"url": urls[idx], "error": f"fetch failed: {e}"}
+
+    result: list[dict] = []
+    for page in pages:
+        if page is None:
+            continue
+        print(f"  [fetch] {page.get('url','')[:70]}...", file=sys.stderr)
         if "error" not in page and page.get("markdown"):
-            pages.append(page)
-    return pages
+            result.append(page)
+    return result
 
 
 # ---------- 阶段 4：Verify ----------
@@ -234,16 +260,25 @@ def verify(pages: list[dict], search_results: list[dict]) -> dict:
     # 从搜索结果中提取关键声明（简化实现）
     claims = []
     for sr in search_results:
-        # 从 grok.content 提取关键句子
-        content = sr.get("grok", {}).get("content", "")
-        if content:
-            # 按句号分割，取前 3 个句子作为声明
-            sentences = [s.strip() for s in content.replace("\n", " ").split("。") if s.strip()][:3]
+        grok = sr.get("grok", {}) or {}
+        tavily = sr.get("tavily", {}) or {}
+        # 合并 grok.content 与 tavily.answer 作为声明来源
+        texts = [grok.get("content", ""), tavily.get("answer", "") or ""]
+        # 来源 URL：优先 grok 引用，回退 tavily 结果
+        cite_urls = [c.get("url", "") for c in grok.get("citations", [])][:3]
+        if not cite_urls:
+            cite_urls = [r.get("url", "") for r in tavily.get("results", [])][:3]
+        overlap = bool(sr.get("overlap_urls"))
+        for content in texts:
+            if not content:
+                continue
+            # 同时支持中英文句号分割，取前 3 个非空句子
+            sentences = [s.strip() for s in re.split(r"[。.]+", content.replace("\n", " ")) if s.strip()][:3]
             for s in sentences:
                 claims.append({
                     "claim": s[:120],
-                    "confidence": "High" if sr.get("overlap_urls") else "Medium",
-                    "sources": [cite["url"] for cite in sr.get("grok", {}).get("citations", [])[:3]],
+                    "confidence": "High" if overlap else "Medium",
+                    "sources": [u for u in cite_urls if u],
                 })
 
     return {
