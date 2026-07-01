@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import re
+import concurrent.futures
 from pathlib import Path
 from typing import Any
 
@@ -89,7 +90,8 @@ def search(sub_queries: list[dict], tool_plan: list[dict] | None = None) -> list
     """对每个子查询执行搜索。返回搜索结果列表。
 
     通过 tool_plan 确定每个子查询的工具选择。
-    简单的同步执行（后续可升级为 ThreadPoolExecutor 并行）。
+    并行执行（ThreadPoolExecutor），保持结果与 sub_queries 原序；
+    单个节点失败不影响其他节点（失败节点记为 {"error": ...}）。
     """
     # 建立 query_id → tool 映射（从 tool_plan 来）
     tool_map: dict = {}
@@ -100,17 +102,33 @@ def search(sub_queries: list[dict], tool_plan: list[dict] | None = None) -> list
             if qid is not None:
                 tool_map[qid] = tool
 
-    results = []
-    for sq in sub_queries:
+    def _do_one(sq: dict) -> tuple[int, dict]:
         qid = sq.get("id")
         # 优先级: tool_plan 映射 > sub_query 自带的 tool > 默认 dual_search
         tool = tool_map.get(qid) or sq.get("tool", "dual_search")
         print(f"  [search] #{sq.get('id', '?')} [{tool}]: {sq['query'][:60]}...", file=sys.stderr)
-        result = _search_sub_query(tool, sq["query"])
+        try:
+            result = _search_sub_query(tool, sq["query"])
+        except Exception as e:
+            result = {"error": f"search failed: {e}"}
         result["query_id"] = qid
         result["query"] = sq["query"]
         result["tool_used"] = tool
-        results.append(result)
+        return qid, result
+
+    results: list[dict] = [None] * len(sub_queries)
+    # 用 index 作为 future→结果槽位的映射，保证原序
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        fut_to_idx = {ex.submit(_do_one, sq): i for i, sq in enumerate(sub_queries)}
+        for fut in concurrent.futures.as_completed(fut_to_idx):
+            idx = fut_to_idx[fut]
+            try:
+                _, res = fut.result()
+            except Exception as e:
+                sq = sub_queries[idx]
+                res = {"error": f"search failed: {e}", "query_id": sq.get("id"),
+                       "query": sq.get("query", ""), "tool_used": tool_map.get(sq.get("id")) or sq.get("tool", "dual_search")}
+            results[idx] = res
     return results
 
 
