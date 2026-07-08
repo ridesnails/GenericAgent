@@ -1,3 +1,13 @@
+---
+name: deepsearch
+description: >
+  Use when the user asks for "深度搜索/深度调研/多源核实/DeepSearch/deep research",
+  or needs multi-source cross-verified answers for complex research questions.
+  Trigger for time-sensitive facts, version numbers, external-state verification,
+  or anything requiring ≥ 2 independent sources. Do not use for simple factual lookup
+  or local codebase search.
+---
+
 # DeepSearch — 多源交叉验证深度搜索引擎
 
 ## 一句话描述

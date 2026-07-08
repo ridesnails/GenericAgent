@@ -1,3 +1,13 @@
+---
+name: axonhub
+description: >
+  Use when the user asks to manage an AxonHub AI-Gateway instance — check status,
+  list/add/update channels or models, manage downstream LLM API keys. Trigger for
+  "AxonHub/api.198707.xyz 渠道/模型/key 管理". Credentials are read from env vars or
+  keychain and never printed. Do not use for generic LLM proxy configuration outside
+  AxonHub.
+---
+
 # AxonHub 实例管理 Skill
 
 用途：对已部署的 AxonHub AI-Gateway 实例做脚本化管理——查看状态、列渠道/模型、按真实 schema 增改渠道与模型、管理下游 LLM API key。凭证按「环境变量优先、本地 keychain 兜底」解析，**绝不打印**。

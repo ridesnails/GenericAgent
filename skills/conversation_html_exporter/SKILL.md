@@ -1,6 +1,11 @@
 ---
 name: conversation-html-exporter
-description: Convert AI conversation transcripts from JSON/Markdown/text into polished single-file HTML archives, with redaction, code highlighting, TOC, search, role filters, collapsible messages, copy buttons, print styles, and optional WebClipper upload.
+description: >
+  Use when the user asks to save, export, archive, or beautify an AI conversation
+  (from JSON/Markdown/text) as a single-file HTML. Trigger for "存档对话/导出对话/
+  转成 HTML/分享对话". Supports secret redaction, code highlighting, search, role
+  filters, and optional WebClipper upload. Do not use for plain markdown export
+  without HTML rendering.
 ---
 
 # Conversation HTML Exporter

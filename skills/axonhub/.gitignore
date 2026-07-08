@@ -1,0 +1,7 @@
+# 运行残留：日志/状态/密钥轮换产物，不入库
+*.log
+*.err.log
+*.out.log
+*.state
+*.lock
+.axonhub_token
