@@ -73,6 +73,7 @@ web_execute_js script='{"cmd": "batch", "commands": [...]}'
     - 瞬态input的核心是**缩短发现→setFileInputFiles时间窗**：优先同batch完成；再不行用DOM事件监听；猴子补丁仅作兜底思路
   - ⚠tabId：CDP默认sender.tab.id(当前注入页)，跨tab需显式tabId或先batch内tabs查
 - ⭐跨tab无需前台：指定tabId即可操作后台标签页
+- ⚠大响应（实测 `Page.captureScreenshot`）若工具层 15s 无 ACK，可能暂留 debugger 占用，紧接的单 CDP 命令会报 `Another debugger is already attached`；先确认前命令未生效，再改用 `batch` 执行下一条 CDP 命令，batch 的结束路径会 detach。不要原样盲重试截图。
 
 ## CDP点击完整生命周期（✅已验证）
 - 通用点击需**三事件序列**：mouseMoved → mousePressed → mouseReleased（间隔50-100ms）

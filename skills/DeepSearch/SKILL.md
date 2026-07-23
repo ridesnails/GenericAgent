@@ -1,158 +1,153 @@
 ---
 name: deepsearch
 description: >
-  Use when the user asks for "深度搜索/深度调研/多源核实/DeepSearch/deep research",
-  or needs multi-source cross-verified answers for complex research questions.
-  Trigger for time-sensitive facts, version numbers, external-state verification,
-  or anything requiring ≥ 2 independent sources. Do not use for simple factual lookup
-  or local codebase search.
+  Use for 深度搜索/深度调研/多源核实/DeepSearch/deep research and for time-sensitive
+  external facts that need citations from multiple sources. This installation routes the
+  former DeepSearch workflow to the deployed GrokSearch HTTP gateway. Do not use for local
+  codebase search, offline reasoning, or tasks where the user explicitly says not to search.
 ---
 
-# DeepSearch — 多源交叉验证深度搜索引擎
+# DeepSearch — routed to deployed GrokSearch gateway
 
 ## 一句话描述
-双引擎（Grok + Tavily）交叉验证 + 证据约束的通用深度搜索 Skill。任何 AI agent 读完本文件即可使用。
+
+本 Skill 保留原 `deepsearch` 触发名，但默认调用已经部署在线上的 **GrokSearch HTTP gateway**，用来替换旧的本地 DeepSearch 工作流。GA 当前没有通用 MCP client，因此本接入是 **Skill + 包装脚本** 形态：agent 通过现有 `code_run` 调用脚本，脚本再请求线上 `/search`。
+
+默认网关：`https://search.198707.xyz`
 
 ## 触发关键词
-当用户消息包含以下关键词时触发：
-- "深度搜索" / "深度调研" / "多源核实" / "DeepSearch" / "deep research"
-- 需要多来源交叉验证的复杂研究问题
-- 涉及时效信息 / 版本号 / 外部状态需联网查证
 
-## 接入方式
+当用户消息包含以下需求时触发：
+- “深度搜索” / “深度调研” / “多源核实” / “DeepSearch” / “deep research”
+- 涉及时效信息、版本号、产品最新状态、外部事实验证
+- 需要 ≥ 2 个独立来源交叉验证的复杂问题
 
-### 方式 1：CLI（通用）
-```
-cd <deepsearch-dir> && uv run deepsearch --query "你的问题"
+不要触发：
+- 本地代码库搜索、文件内容定位、纯代码编辑
+- 用户明确说“不要联网/不要搜索”
+- 简单常识或无需来源的离线推理
 
-# 快速模式（仅双引擎搜索，不做全流程）
-uv run deepsearch --query "简单问题" --mode quick
+## 必需配置
 
-# 抓取页面
-uv run deepsearch fetch --url "https://example.com"
+优先级：
 
-# 启动 MCP Server
-uv run deepsearch serve
-```
+1. 临时覆盖：启动 GA 的 shell / launchd / 桌面桥进程环境变量。
+2. 持久默认：GA 本地 keychain 条目 `groksearch_bearer_token`。
 
-### 方式 2：MCP Server（Claude Code 等 MCP agent）
-```json
-// MCP server 配置
-{
-  "mcpServers": {
-    "deepsearch": {
-      "type": "stdio",
-      "command": "uv",
-      "args": ["run", "--directory", "<deepsearch-dir>", "deepsearch", "serve"]
-    }
-  }
-}
+环境变量示例：
+
+```bash
+export GROKSEARCH_URL="https://search.198707.xyz"
+export GROKSEARCH_BEARER_TOKEN="<线上网关 bearer token>"
 ```
 
-暴露的 MCP Tools：
-| Tool | 功能 | 参数 |
-|------|------|------|
-| `deep_search` | 完整 5 阶段深度调研 | query: string |
-| `quick_search` | 快速双引擎搜索 | query: string |
-| `fetch_page` | 获取网页正文 | url: string |
+兼容变量：`GROKSEARCH_TOKEN` 可替代 `GROKSEARCH_BEARER_TOKEN`。
 
-### 方式 3：Python API（手动调用）
+若不用环境变量，可保存到 GA keychain：
+
 ```python
-from deepsearch.engine import deep_search
-
-result = deep_search(question="你的问题", mode="standard")
-# mode="quick" 仅双引擎快速搜索
+from keychain import keys
+keys.set("groksearch_bearer_token", "<线上网关 bearer token>")
 ```
+
+安全要求：
+- 不要把真实 bearer token 写入 `SKILL.md`、脚本、`.env.example` 或 git。
+- `/health` 不需要 token；`/search` 必须能从 env 或 keychain 取到 token。
+- 如果返回 401，优先检查 env 覆盖值是否旧；其次检查 keychain 条目；必要时重启 GA/desktop bridge。
+
+## Agent 调用方式
+
+### 1. 健康检查
+
+```bash
+cd /Users/qing/code/GenericAgent
+python3 skills/DeepSearch/scripts/groksearch_gateway.py --health
+```
+
+期望看到 JSON 内含 `status: ok`，HTTP 状态为 200。
+
+### 2. 搜索
+
+```bash
+cd /Users/qing/code/GenericAgent
+python3 skills/DeepSearch/scripts/groksearch_gateway.py "要搜索的问题" --timeout 180
+```
+
+或传原始 JSON：
+
+```bash
+python3 skills/DeepSearch/scripts/groksearch_gateway.py --json '{"query":"要搜索的问题","max_sources":5}' --timeout 180
+```
+
+脚本只使用 Python 标准库，不依赖旧 DeepSearch venv。
 
 ## 工作流程
 
-当 agent 决定使用 DeepSearch 时，建议按以下步骤：
-
-### Step 1：判断是否需要搜索
-**需要**：用户明确要求 / 涉及实时数据 / 需验证内部知识 / 版本号 / 产品最新状态
-**不需要**：纯代码编写 / 用户说"不要搜"
-
-### Step 2：按复杂度选择模式
-| 级别 | 场景 | 模式 |
-|------|------|------|
-| L1 单一事实（1 次搜索） | "FastAPI 最新版本" | `quick_search` |
-| L2 多角度比较（3-5 次） | "Flask vs FastAPI 2026" | `deep_search` |
-| L3 深度调研（6+ 次） | "向量数据库完整对比" | `deep_search` |
-
-### Step 3：评估结果
-收到结果后 agent 必须执行以下验证 — 不信任单一来源：
+1. 判断是否需要联网搜索。
+   - 需要：用户明确要求、实时信息、版本号、外部状态、事实核验。
+   - 不需要：本地仓库搜索、纯代码任务、用户拒绝联网。
+2. 先运行健康检查；若 `/health` 失败，停止并报告网关不可用。
+3. 运行搜索脚本；超时时把 `--timeout` 提高到 180 或 240 秒，最多重试一次。
+4. 解析返回 JSON，提取 answer/content/findings/sources/citations 等字段。
+5. 最终回答必须带引用；没有来源的关键事实不要断言。
 
 ## 证据标准（agent 必须遵守）
 
 ### 置信度标注
+
 | 标签 | 判据 |
 |------|------|
-| **High** | ≥ 2 真正独立来源 + 官方/主流媒体 + 时效符合 |
-| **Medium** | ≥ 2 来源但一个非权威，或多源有可解释分歧 |
-| **Low** | 单一来源 / 非权威 / 时效不明 |
+| **High** | ≥ 2 真正独立来源 + 官方/主流来源 + 时效符合 |
+| **Medium** | ≥ 2 来源但权威性一般，或多源有可解释分歧 |
+| **Low** | 单一来源、非权威来源、时效不明或结果不充分 |
 
 ### 引用规则
-- 每个关键事实后带 `[标题](URL)` 引用
-- **严禁编造引用** — 没有来源的不说
-- 末尾必须有 `Sources:` 节，列出全部 URL
 
-### 冲突处理
-- 不隐藏分歧，展示双方证据
-- 官方 > 主流 > 自媒体；近期 > 远期；原始 > 二手
-- 证据不足以决断时诚实说"存在分歧"
+- 每个关键事实后带 `[标题](URL)` 引用。
+- 严禁编造引用；没有 URL 的来源不能当作已验证引用。
+- 末尾保留 `Sources:` 节，列出实际使用的 URL。
+- 来源冲突时必须展示分歧，不要合并成单一结论。
 
 ### 来源质量
+
 | 级别 | 包含 |
 |------|------|
-| **高** | 官方文档、GitHub、PyPI、arxiv、PEP/RFC 标准文档 |
-| **中** | Wikipedia、Stack Overflow、Reddit、Hacker News |
+| **高** | 官方文档、GitHub、PyPI、arxiv、PEP/RFC、政府/标准机构 |
+| **中** | Wikipedia、Stack Overflow、Reddit、Hacker News、主流媒体 |
 | **低** | 无名个人博客、SEO 农场、AI 生成聚合站 |
 
 仅有单一来源时，显式标注 `置信度: Low`。
 
-## 输出格式结构
+## 常见故障
 
-CLI 和 MCP Server 都返回 JSON，结构如下：
+- `GROKSEARCH_BEARER_TOKEN is required`：GA 进程环境缺少 token；设置后重启 GA/desktop bridge。
+- `HTTPError 401`：token 不匹配或线上容器仍使用旧 env；确认线上 `.env` 后 redeploy。
+- `HTTPError 503`：后端搜索依赖暂不可用；稍后重试并保留错误 JSON。
+- `timeout`：搜索耗时较长；用 `--timeout 180` 或 `--timeout 240` 重试一次。
 
-### quick_search 输出
-```json
-{
-  "query": "...",
-  "mode": "quick",
-  "plan": { "sub_queries": [...], "strategy": "..." },
-  "search_results": [
-    {
-      "query_id": 1,
-      "grok": { "content": "...", "citations": [{"url": "...", "title": ""}] },
-      "tavily": { "answer": "...", "results": [{"title": "...", "url": "...", "content": "...", "score": 0.9}] },
-      "overlap_urls": [...],
-      "confidence_hint": "high|medium|low"
-    }
-  ],
-  "elapsed_s": 12.3
-}
+## 输出格式建议
+
+```markdown
+结论：...
+
+关键发现：
+1. ... [来源标题](https://...)
+2. ... [来源标题](https://...)
+
+置信度：High|Medium|Low
+
+Sources:
+- [来源标题](https://...)
 ```
 
-### deep_search 输出
-```json
-{
-  "question": "...",
-  "summary": "一句话摘要",
-  "findings": [{"statement": "...", "confidence": "High|Medium|Low", "sources": ["url1", "url2"]}],
-  "evidence_grading": "High|Medium|Low",
-  "sources": [{"url": "...", "quality": "high|medium|low"}],
-  "caveats": ["来源不足，建议手动核实"],
-  "_meta": { "elapsed_s": 45.6 }
-}
-```
+## 自检清单
 
-## 快速自检清单（agent 交付前检查）
-- [ ] 每个事实结论都有 ≥ 1 个 `[标题](URL)` 引用
-- [ ] 单源结论都标了 `置信度: Low`
-- [ ] 所有 URL 都是真实存在、已验证的
-- [ ] 来源有分歧的地方没藏着掖着
-- [ ] 没使用"一般来说 / 据报道 / 多个来源显示"这种无根据的措辞
+- [ ] 搜索脚本实际运行过，而不是凭记忆回答
+- [ ] 每个关键事实至少有 1 个真实 URL 引用
+- [ ] 单源结论标了 `置信度: Low`
+- [ ] 有分歧的来源已说明分歧
+- [ ] 没泄露 bearer token
 
 ---
 
-*DeepSearch v1.0 — 双引擎 + 证据强约束通用搜索 Skill*
+*DeepSearch compatibility skill — powered by deployed GrokSearch gateway.*

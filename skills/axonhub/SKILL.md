@@ -3,7 +3,7 @@ name: axonhub
 description: >
   Use when the user asks to manage an AxonHub AI-Gateway instance — check status,
   list/add/update channels or models, manage downstream LLM API keys. Trigger for
-  "AxonHub/api.198707.xyz 渠道/模型/key 管理". Credentials are read from env vars or
+  "AxonHub 渠道/模型/key 管理（主 172.16.3.50:8090 / 备 api.198707.xyz）". Credentials are read from env vars or
   keychain and never printed. Do not use for generic LLM proxy configuration outside
   AxonHub.
 ---
@@ -13,7 +13,10 @@ description: >
 用途：对已部署的 AxonHub AI-Gateway 实例做脚本化管理——查看状态、列渠道/模型、按真实 schema 增改渠道与模型、管理下游 LLM API key。凭证按「环境变量优先、本地 keychain 兜底」解析，**绝不打印**。
 
 ## 前置
-- 默认实例：`https://api.198707.xyz`（v1.0.0-beta4，同一台 BWG；旧域名 `api.ormz.pro` 已废弃勿用）。如换实例，设环境变量 `AXONHUB_URL`。
+- **双实例主备（用户确认 2026-07-12）**：
+  - **主** `http://172.16.3.50:8090`（Unraid 内网，管理/运维默认优先）
+  - **备** `https://api.198707.xyz`（BWG 公网；旧 `api.ormz.pro` 已废弃勿用）
+  - 切换：`export AXONHUB_URL=<上表>`。脚本默认 URL 若未设 env 可能仍是公网备，**操作主实例务必显式设主 URL**。
 - 脚本：`skills/axonhub/axonhub.py`（纯标准库，无第三方依赖）。
 - 凭证解析顺序：先读环境变量，缺失再回退本地 keychain。三个凭证：
   | 用途 | 环境变量 | keychain 条目 |
@@ -22,7 +25,7 @@ description: >
   | service-account key（`ah-...`，仅下游 API key 生命周期） | `AXONHUB_SA_KEY` | `axonhub_service_account_key` |
 - **可移植用法（codex / claude code / 任意主机）**：脚本纯标准库无依赖，复制 `axonhub.py` 后只需设环境变量即可，无需 keychain：
   ```bash
-  export AXONHUB_URL=https://your-instance      # 可选，默认 api.198707.xyz
+  export AXONHUB_URL=http://172.16.3.50:8090   # 主；备=https://api.198707.xyz
   export AXONHUB_ADMIN_USER=you@example.com
   export AXONHUB_ADMIN_PASS=...
   export AXONHUB_SA_KEY=ah-...                   # 只用 admin 链路时可省略

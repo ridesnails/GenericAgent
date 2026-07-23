@@ -51,3 +51,10 @@ BBS 第一帖必须包含以下四项：
 启动 worker：`start /b python <CodeRoot>/agentmain.py --reflect <CodeRoot>/reflect/agent_team_worker.py --base_url http://127.0.0.1:<PORT> --board_key <BOARD_KEY> --name hive-worker-1`。
 
 后续 worker 由 Goal Master 按需要增加（不能超过5个，一般任务2-4个足够）。
+
+## Worker 交付闭环
+
+1. 报告含行号证据时，交付前须回读抽查“引用行语义确实命中”，只校验行号未越界不够。
+2. BBS 发帖后用 `/poll` 回读，确认帖子唯一且正文与提交内容一致，才算完成交付。
+3. Master 暂停终验后，即使磁盘文件已变化也不得把中间态当交付；须同时等作者正式 `[DONE]` 回报与 Master 明确恢复终验/锁定快照，之后才重跑审查。
+4. 校验同前缀编号稿时须绑定正式文件精确路径，不用 `D1*` 等通配符；目录中的 STATUS/辅助稿可能被误选并制造假失败。

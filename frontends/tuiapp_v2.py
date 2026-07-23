@@ -3728,6 +3728,7 @@ class GenericAgentTUI(App[None]):
         # turn off ?1007, which on macOS Terminal / iTerm2 makes the wheel emit both mouse
         # events and ↑/↓ keys — triggering InputArea history nav.
         self._term_write("\x1b[?1007l")
+        self._disable_mouse_reporting_if_requested()
 
     def _tick(self) -> None:
         # 0.5s poll: refresh clock + detect resizes Windows misses (snap, fullscreen).
@@ -7070,6 +7071,11 @@ class GenericAgentTUI(App[None]):
                           term_width=term_w, workspace=ws_name))
         self._ensure_title_timer()
         self._update_terminal_title()
+
+    def _disable_mouse_reporting_if_requested(self) -> None:
+        if os.getenv("GA_TUI_DISABLE_MOUSE", "").lower() not in {"1", "true", "yes", "on"}:
+            return
+        self._term_write("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1005l\x1b[?1006l\x1b[?1015l\x1b[?1007l")
 
     def _term_write(self, data: str) -> None:
         """Emit a raw control sequence to the terminal THROUGH Textual's driver.
