@@ -8,7 +8,8 @@ if _ROOT not in sys.path: sys.path.append(_ROOT)
 def _load_mykeys():
     global _mykey_path
     try:
-        import mykey; importlib.reload(mykey); _mykey_path = mykey.__file__
+        sys.modules.pop('mykey', None)
+        import mykey; _mykey_path = mykey.__file__
         return {k: v for k, v in vars(mykey).items() if not k.startswith('_')}
     except ImportError as e:
         if getattr(e, 'name', None) != 'mykey':
@@ -21,13 +22,15 @@ def _load_mykeys():
     if isinstance(mk, dict) and 'remote_url' in mk: return requests.get(mk['remote_url'], timeout=10).json()
     return mk
 
+_mykey_lock = threading.Lock()
 _mykey_path = _mykey_mtime = None
 def reload_mykeys():
     global _mykey_mtime
     try:
         mt = os.stat(_mykey_path).st_mtime_ns if _mykey_path else -1
         if mt == _mykey_mtime: return globals().get('mykeys', {}), False
-        mk = _load_mykeys(); _mykey_mtime = os.stat(_mykey_path).st_mtime_ns
+        with _mykey_lock: mk = _load_mykeys()
+        _mykey_mtime = os.stat(_mykey_path).st_mtime_ns
         print(f'[Info] Load mykeys from {_mykey_path}')
         globals().update(mykeys=mk)
         return mk, True
@@ -546,7 +549,7 @@ class BaseSession:
         if 'deepseek' in self.model.lower():
             default_context_win = 70000; default_cut_msg_interval = 25; self.trim_keep_rate = 0.3
         self.context_win = cfg.get('context_win', default_context_win)
-        self.maxlen_multiplier = min(max(self.context_win / default_context_win * 0.85, 1.0), 3.0)
+        self.maxlen_multiplier = min(max(self.context_win / default_context_win * 0.75, 1.0), 3.0)
         self.cut_msg_interval = int(default_cut_msg_interval * self.maxlen_multiplier)
         self.trim_keep_prefix = max(0, int(cfg.get('trim_keep_prefix', 0) or 0))
         self.history = []; self.lock = threading.Lock(); self.system = ""
@@ -560,7 +563,7 @@ class BaseSession:
         self.verify = cfg.get('verify', True)
         self.stream = cfg.get('stream', True)
         default_ct, default_rt = (5, 40) if self.stream else (10, 240)
-        self.connect_timeout = max(1, int(cfg.get('connect_timeout', cfg.get('timeout', default_ct))))
+        self.connect_timeout = max(1, int(cfg.get('timeout', default_ct)))
         self.read_timeout = max(5, int(cfg.get('read_timeout', default_rt)))
         def _enum(key, valid):
             v = cfg.get(key); v = None if v is None else str(v).strip().lower()
@@ -700,7 +703,7 @@ class NativeClaudeSession(BaseSession):
         messages = _fix_messages(messages)
         if 'claude' in model.lower(): messages = _drop_unsigned_thinking(messages)
         messages = _ensure_thinking_blocks(messages, self.model)
-        beta_parts = ["claude-code-20250219", "interleaved-thinking-2025-05-14", "redact-thinking-2026-02-12", "context-management-2025-06-27", "prompt-caching-scope-2026-01-05", "effort-2025-11-24"]
+        beta_parts = ["claude-code-20250219", "interleaved-thinking-2025-05-14", "redact-thinking-2026-02-12", "thinking-token-count-2026-05-13", "context-management-2025-06-27", "prompt-caching-scope-2026-01-05", "mid-conversation-system-2026-04-07", "effort-2025-11-24", "fallback-credit-2026-06-01"]
         if "[1m]" in model.lower():
             beta_parts.insert(1, "context-1m-2025-08-07"); model = model.replace("[1m]", "").replace("[1M]", "")
         headers = {"Content-Type": "application/json", "anthropic-version": "2023-06-01",
@@ -1122,6 +1125,7 @@ class NativeToolClient:
 def resolve_session(cfg_name):
     cfg = reload_mykeys()[0].get(cfg_name)
     if not cfg: raise ValueError(f"Config '{cfg_name}' not in mykey")
+    cfg['_mykey_name'] = cfg_name
     if 'native' in cfg_name: return (NativeClaudeSession if 'claude' in cfg_name else NativeOAISession)(cfg=cfg)
     if 'claude' in cfg_name: return ClaudeSession(cfg=cfg)
     return LLMSession(cfg=cfg) if 'oai' in cfg_name else None

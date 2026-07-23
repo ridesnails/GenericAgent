@@ -460,12 +460,11 @@ class GenericAgentHandler(BaseHandler):
     def do_update_working_checkpoint(self, args, response):
         '''为整个任务设定后续需要临时记忆的重点。'''
         key_info = args.get("key_info", "")
-        related_sop = args.get("related_sop", "")
         if "key_info" in args: self.working['key_info'] = key_info
-        if "related_sop" in args: self.working['related_sop'] = related_sop
         self.working['passed_sessions'] = 0
-        yield f"[Info] Updated key_info and related_sop.\n"
+        yield f"[Info] Updated key_info.\n"
         next_prompt = self._get_anchor_prompt(skip=args.get('_index', 0) > 0)
+        if self.current_turn <= 1: next_prompt += "\n[TIPS] Working checkpoint updated. Do not call update_working_checkpoint again unless new, non-obvious facts appear. Skip for short tasks.\n"
         #next_prompt += '\n[SYSTEM TIPS] 此函数一般在任务开始或中间时调用，如果任务已成功完成应该是start_long_term_update用于结算长期记忆。\n'
         return StepOutcome({"result": "working key_info updated"}, next_prompt=next_prompt)
 
@@ -483,7 +482,7 @@ class GenericAgentHandler(BaseHandler):
         if not response or (not content.strip() and not thinking.strip()):
             yield "[Warn] LLM returned an empty response. Retrying...\n"
             return self._retry_or_exit("[System] Blank response, regenerate and tooluse")
-        if '[!!! 流异常中断' in content[-100:] or '!!!Error:' in content[-100:]:
+        if '[!!! 流异常中断' in content[-100:] or '!!!Error:' in content[-100:] or content.endswith('</summary>'):
             return self._retry_or_exit("[System] Incomplete response. Regenerate and tooluse.")
         if 'max_tokens !!!]' in content[-100:]:
             return self._retry_or_exit("[System] max_tokens limit reached. Use multi small steps to do it.")
@@ -539,6 +538,7 @@ class GenericAgentHandler(BaseHandler):
         path = './memory/memory_management_sop.md'
         if os.path.exists(path): result = 'This is L0:\n' + file_read(path, show_linenos=False)
         else: result = "Memory Management SOP not found. Do not update memory."
+        if self.current_turn < 10: result, prompt = 'start_long_term_update is only used after completing a long turn task!', '\n'
         return StepOutcome(result, next_prompt=prompt)
 
     def _fold_earlier(self, lines):
@@ -564,7 +564,6 @@ class GenericAgentHandler(BaseHandler):
         prompt = f"\n### [WORKING MEMORY]\n{earlier}{history}"
         prompt += f"\nCurrent turn: {self.current_turn}\n"
         if self.working.get('key_info'): prompt += f"\n<key_info>{self.working.get('key_info')}</key_info>"
-        if self.working.get('related_sop'): prompt += f"\n有不清晰的地方请再次读取{self.working.get('related_sop')}"
         if getattr(self.parent, 'verbose', False): self.print(prompt)
         return prompt
     

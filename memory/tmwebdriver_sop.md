@@ -37,17 +37,12 @@ fetch('PDF_URL').then(r=>r.blob()).then(b=>{
 ```
 注意：需同源或CORS允许，跨域先导航到目标域再执行
 
-## LinuxDO 附件下载坑
-- 已验证：linux.do 附件在普通 `curl`、浏览器 `fetch`、带 Cookie 的 curl 可能仍 403；`curl_cffi.requests` 携带浏览器 Cookie 且 `impersonate='chrome124'` 可下载到可读工作目录。
-- macOS 下 Chrome 已下载到 `~/Downloads` 时，当前执行器可能因 TCC 无权读取；优先改用浏览器 TLS 指纹直下，避免反复尝试复制 Downloads。
-
 ## Chrome后台标签节流
 - 后台标签中`setTimeout`被Chrome intensive throttling延迟到≥1min/次，扩展脚本中避免依赖setTimeout轮询
 - 某些SPA页面需CDP `Page.bringToFront`切到前台才会加载数据
 
 ## CDP桥(tmwd_cdp_bridge扩展) ⭐首选
 扩展路径：`assets/tmwd_cdp_bridge/`(需安装，含debugger权限)
-⚠TID约定标识：首次运行自动生成到`assets/tmwd_cdp_bridge/config.js`(已gitignore)，扩展通过manifest引用
 调用：`web_execute_js` script直传JSON字符串（工具层自动识别对象格式，走WS→background.js cmd路由）
 ```js
 // 直接传JSON字符串作为script参数，无需DOM操作
@@ -57,7 +52,7 @@ web_execute_js script='{"cmd": "cdp", "tabId": N, "method": "...", "params": {..
 web_execute_js script='{"cmd": "batch", "commands": [...]}'
 // 返回值直接是JSON结果
 ```
-通信方式：⭐JSON字符串直传(首选) | TID DOM方式(TID元素+MutationObserver，web_scan/execute_js底层依赖)
+通信方式：JSON字符串经WS直传background.js；不经过页面DOM
 单命令：`{cmd:'tabs'}` | `{cmd:'cookies'}` | `{cmd:'cdp', tabId:N, method:'...', params:{...}}` | `{cmd:'management', method:'list|reload|disable|enable', extId:'...'}`
 - management：list返回所有扩展信息；reload/disable/enable需传extId
 - contentSettings：`{cmd:'contentSettings', type:'automaticDownloads', pattern:'https://*/*', setting:'allow'}`
@@ -106,14 +101,6 @@ web_execute_js script='{"cmd": "batch", "commands": [...]}'
   - batch链式引用：`$0.frameTree.childFrames`遍历找url匹配的frame，`$1.executionContextId`传给evaluate
   - postMessage中继方案仅在content script已注入iframe时有效，第三方支付iframe通常无注入
 
-## CDP绕过Cloudflare Turnstile（✅已验证）
-- ⭐**场景**：connect.linux.do OAuth页面有Turnstile人机验证，JS click(isTrusted=false)被拦截
-- ⭐**方法**：CDP `Input.dispatchMouseEvent` 三事件序列（mouseMoved→mousePressed→mouseReleased）可绕过Turnstile
-  - Turnstile复选框通常是页面上一个24x24的小按钮，可通过CDP获取DOM坐标后点击
-  - connect.linux.do上Turnstile复选框位置可通过`document.querySelectorAll('input[type=submit]')`或查找iframe外的小按钮定位
-  - batch格式：`{cmd:'cdp', tabId:N, method:'Input.dispatchMouseEvent', params:{type:'mouseMoved',x:N,y:N}}` → `mousePressed` → `mouseReleased`
-- ⚠注意：Turnstile验证可能在iframe中，需先`Page.getFrameTree`查找；本例中connect.linux.do的Turnstile不在iframe中
-
 ## CDP文本输入（未验证，BBS#23）
 - `insertText`快但无key事件；受控组件需补dispatch `input`事件
 - 需完整键盘模拟时用`dispatchKeyEvent`逐键派发
@@ -130,7 +117,7 @@ web_execute_js script='{"cmd": "batch", "commands": [...]}'
 ## autofill获取与登录
 检测：web_scan输出input带`data-autofilled="true"`，value显示为受保护提示(非真实值，Chrome安全保护需点击释放)
 - ⚠**前置条件：必须先CDP `Page.bringToFront` 切tab到前台**，Chrome仅在前台tab释放autofill保护值，后台tab物理点击无效
-- ⭐**一键释放与登录**：bringToFront → mousePressed点任一字段(无需Released，一个释放全页) → 等500ms → 补input/change事件 → 点登录
+- ⭐**最快登录（✅已验证）**：bringToFront → 无视按钮`disabled`，直接CDP完整点击登录按钮（无需处理字段）；失败再兜底：mousePressed任一字段 → 等500ms → 补input/change → 点登录
 
 ## 验证码/页面视觉截图
 - ⭐首选CDP截图：`Page.captureScreenshot`(format:'png')→返回base64，无需前台/后台tab也行，全页高清

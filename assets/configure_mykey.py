@@ -675,27 +675,16 @@ def probe_models(provider, apikey, apibase=None):
     ptype = provider.get('type', 'native_oai')
     base = (apibase or provider['template'].get('apibase', '')).rstrip('/')
 
-    if re.search(r'/v\d+(/|$)', base):
-        urls = [f"{base}/models"]
-    else:
-        urls = [f"{base}/models", f"{base}/v1/models"]
-
-    user_agent = provider['template'].get('user_agent') or 'GenericAgent/1.0'
     if ptype == 'native_claude':
-        common_headers = {'anthropic-version': '2023-06-01', 'User-Agent': user_agent}
-        x_api_key_headers = {'x-api-key': apikey, **common_headers}
-        bearer_headers = {'Authorization': f'Bearer {apikey}', **common_headers}
-        headers_list = (
-            [x_api_key_headers, bearer_headers]
-            if str(apikey).startswith('sk-ant-')
-            else [bearer_headers, x_api_key_headers]
-        )
+        url = f"{base}/v1/models"
+        headers = {'x-api-key': apikey, 'anthropic-version': '2023-06-01', 'User-Agent': 'GenericAgent/1.0'}
     else:
-        headers_list = [{'Authorization': f'Bearer {apikey}', 'User-Agent': user_agent}]
+        url = f"{base}/models"
+        headers = {'Authorization': f'Bearer {apikey}', 'User-Agent': 'GenericAgent/1.0'}
 
-    print(f"\n  {C['dim']}🔍 正在探测可用模型 ({', '.join(urls)})...{C['reset']}", end='', flush=True)
+    print(f"\n  {C['dim']}🔍 正在探测可用模型 ({base}/models)...{C['reset']}", end='', flush=True)
     if ptype == 'native_claude':
-        print(f" {C['dim']}(Anthropic 协议，按运行时鉴权探测){C['reset']}", end='', flush=True)
+        print(f" {C['dim']}(Anthropic 协议，探测可能失败){C['reset']}", end='', flush=True)
 
     opener = urllib.request.build_opener()
     ph = _get_proxy_handler()
@@ -703,30 +692,24 @@ def probe_models(provider, apikey, apibase=None):
         opener = urllib.request.build_opener(ph)
         print(f" {C['dim']}(via proxy){C['reset']}", end='', flush=True)
 
-    last_error = None
     for attempt in range(2):
-        for url in urls:
-            for headers in headers_list:
-                try:
-                    req = urllib.request.Request(url, headers=headers, method='GET')
-                    with opener.open(req, timeout=10) as resp:
-                        data = json.loads(resp.read().decode())
-                        models = data.get('data', [])
-                        ids = sorted(set(m['id'] for m in models if isinstance(m, dict) and m.get('id')))
-                        if ids:
-                            print(f" {C['green']}✓ 发现 {len(ids)} 个模型{C['reset']}")
-                            return ids
-                        print(f" {C['yellow']}⚠ 返回为空{C['reset']}")
-                        return None
-                except Exception as e:
-                    last_error = e
-                    continue
-        if last_error and attempt == 0 and 'timeout' in type(last_error).__name__.lower():
-            print(f" {C['yellow']}⏱ 超时，重试...{C['reset']}", end='', flush=True)
-            continue
-        break
-    err_name = type(last_error).__name__ if last_error else 'UnknownError'
-    print(f" {C['yellow']}⚠ 探测失败: {err_name}（将使用预设列表）{C['reset']}")
+        try:
+            req = urllib.request.Request(url, headers=headers, method='GET')
+            with opener.open(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+                models = data.get('data', [])
+                ids = sorted(set(m['id'] for m in models if isinstance(m, dict) and m.get('id')))
+                if ids:
+                    print(f" {C['green']}✓ 发现 {len(ids)} 个模型{C['reset']}")
+                    return ids
+                print(f" {C['yellow']}⚠ 返回为空{C['reset']}")
+                return None
+        except Exception as e:
+            if attempt == 0 and 'timeout' in type(e).__name__.lower():
+                print(f" {C['yellow']}⏱ 超时，重试...{C['reset']}", end='', flush=True)
+                continue
+            print(f" {C['yellow']}⚠ 探测失败: {type(e).__name__}（将使用预设列表）{C['reset']}")
+            return None
     return None
 
 def _normalize_model_choices(choices):

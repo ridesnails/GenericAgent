@@ -2,10 +2,8 @@
 import json, os, hashlib, pathlib, getpass
 
 _PATH = pathlib.Path.home() / "ga_keychain.enc"
-# NOTE: do NOT use os.getlogin() — it reads the controlling tty's owner and
-# differs/fails under launchd, cron and sandboxed shells, making the mask
-# (and thus the file) undecryptable across contexts.
-_user = getpass.getuser()
+try: _user = os.getlogin()
+except OSError: _user = getpass.getuser()
 _MASK = hashlib.sha256(f"{_user}@ga_keychain".encode()).digest()
 
 def _xor(data: bytes) -> bytes:

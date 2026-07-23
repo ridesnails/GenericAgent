@@ -17,7 +17,6 @@ import json
 import os
 import queue
 import re
-from pathlib import Path
 import sys
 import tempfile
 import threading
@@ -34,55 +33,22 @@ from typing import Any, Callable, Optional
 
 
 def _ensure_tui_deps() -> None:
-    """Ensure Rich/Textual are importable without mutating system Python.
-
-    Strategy:
-    1. If deps are already available, continue.
-    2. If we are running outside a virtual environment and the repo has a
-       `.venv`, re-exec this script with that interpreter.
-    3. Only auto-install when the current interpreter is already isolated.
-    4. Otherwise, stop with explicit remediation commands.
-    """
+    """Try the imports; on first miss, pip-install the wheel and retry once.
+    Keeps `ga-cli` working on a fresh Python (Windows / macOS / Linux) where
+    Textual or Rich hasn't been installed yet. Bails with a clear message if
+    pip itself is unavailable or the install fails — never silently."""
     import importlib.util, subprocess
-
     needed = ("rich", "textual")
     missing = [m for m in needed if importlib.util.find_spec(m) is None]
-    if not missing:
-        return
-
-    project_root = Path(__file__).resolve().parents[1]
-    venv_python = project_root / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    in_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
-
-    if not in_venv and venv_python.exists():
-        print(f"[ga-tui] missing {' '.join(missing)} on system Python; re-launching with {venv_python} ...",
-              file=sys.stderr)
-        os.execv(str(venv_python), [str(venv_python), str(Path(__file__).resolve()), *sys.argv[1:]])
-
-    if not in_venv:
-        install_cmd = f"cd {project_root} && uv venv && uv pip install -e '.[ui]'"
-        run_cmd = f"{venv_python} {Path(__file__).resolve()}" if venv_python else f"python frontends/tuiapp_v2.py"
-        print(
-            "[ga-tui] rich/textual are missing, but the current interpreter is system-managed.\n"
-            f"    current: {sys.executable}\n"
-            f"    fix: {install_cmd}\n"
-            f"    then: {run_cmd}",
-            file=sys.stderr,
-        )
-        raise SystemExit(2)
-
-    print(f"[ga-tui] installing {' '.join(missing)} into virtualenv {sys.executable} ...", file=sys.stderr)
+    if not missing: return
+    print(f"[ga-tui] installing {' '.join(missing)} into {sys.executable} ...", file=sys.stderr)
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", *missing])
     except Exception as e:
-        print(
-            f"[ga-tui] auto-install failed: {e}\n"
-            f"    fix: {sys.executable} -m pip install {' '.join(missing)}",
-            file=sys.stderr,
-        )
+        print(f"[ga-tui] auto-install failed: {e}\n    fix: {sys.executable} -m pip install {' '.join(missing)}",
+              file=sys.stderr)
         raise SystemExit(2)
-    for m in missing:
-        importlib.invalidate_caches()
+    for m in missing: importlib.invalidate_caches()
 
 
 _ensure_tui_deps()

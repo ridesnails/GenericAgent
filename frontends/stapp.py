@@ -14,7 +14,8 @@ sys.path.append(os.path.abspath(script_dir))
 import streamlit as st
 import time, json, re, threading, queue
 from datetime import timedelta
-from agentmain import GeneraticAgent
+import agentmain
+from agentmain import GenericAgent
 import chatapp_common  # activate /continue command (monkey patches GeneraticAgent)
 from continue_cmd import handle_frontend_command, reset_conversation, list_sessions, extract_ui_messages
 from btw_cmd import handle_frontend_command as btw_handle_frontend
@@ -27,6 +28,10 @@ st.markdown("""
 [data-testid="stBottom"]{position:fixed!important;bottom:0!important;left:0!important;right:0!important;width:100vw!important;z-index:999;background:var(--background-color,#fff)}
 @media (min-width:768px){[data-testid="stSidebar"][aria-expanded="true"]~div [data-testid="stBottom"]{left:300px!important;width:calc(100vw - 300px)!important}}
 .stMainBlockContainer{padding-bottom:10rem!important}
+/* 边栏分割线：收紧默认大留白，略留一点呼吸 */
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] hr,
+[data-testid="stSidebar"] hr{margin:0.55rem 0!important}
+[data-testid="stSidebar"] [data-testid="element-container"]:has(hr){margin:0!important;padding:0!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,38 +43,60 @@ I18N = {
         'desktop_pet': '🐱 桌面宠物',
         'suggest_btn': '🎯 给我找点事做',
         'suggest_prompt': '按照自主行动的规划部分，充分分析我的情况，给我生成一批TODO，务必让我感兴趣',
-        'auto_start': '开始空闲自主行动',
         'auto_pause': '⏸️ 禁止自主行动',
         'auto_enable': '▶️ 允许自主行动',
-        'auto_on_cap': '🟢 自主行动运行中，会在你离开它30分钟后自动进行',
+        'auto_on_cap': '🟢 已允许：约1分钟后启动，之后空闲30分钟再触发',
         'auto_off_cap': '🔴 自主行动已停止',
         'auto_prompt': '[AUTO]🤖 用户已经离开超过30分钟，作为自主智能体，请阅读自动化sop，执行自动任务。',
+        'get_token': '🔑 获取 Token',
+        'get_token_toast': '已打开浏览器',
+        'need_mykey': '⚠️ 请配置 mykey.py',
+        'reopen_page': '等待配置写入，完成后将自动进入…',
     },
     'en': {
         'force_stop': 'Force Stop',
         'desktop_pet': '🐱 Desktop Pet',
         'suggest_btn': '🎯 Suggest tasks',
         'suggest_prompt': 'Following the planning section of autonomous sop, analyze my situation thoroughly and generate a batch of TODOs that will interest me.',
-        'auto_start': 'Start idle auto-action',
         'auto_pause': '⏸️ Pause auto-action',
         'auto_enable': '▶️ Enable auto-action',
-        'auto_on_cap': '🟢 Auto-action enabled, triggers after 30min idle',
+        'auto_on_cap': '🟢 On: first run ~1min, then every 30min idle',
         'auto_off_cap': '🔴 Auto-action disabled',
         'auto_prompt': '[AUTO]🤖 User has been idle for over 30 minutes. As an autonomous agent, read the automation SOP and execute automatic tasks.',
+        'get_token': '🔑 Get Token',
+        'get_token_toast': 'Opened in browser',
+        'need_mykey': '⚠️ Please set mykey.py',
+        'reopen_page': 'Waiting for config… will enter automatically',
     },
 }
 def T(key): return I18N.get(LANG, I18N['zh']).get(key, key)
 
 @st.cache_resource
 def init():
-    agent = GeneraticAgent()
-    if agent.llmclient is None:
-        st.error("⚠️ Please set mykey.py!")
-        st.stop()
-    else: threading.Thread(target=agent.run, daemon=True).start()
+    agent = GenericAgent()
+    threading.Thread(target=agent.run, daemon=True).start()
     return agent
 
 agent = init()
+_sp = getattr(agentmain, "start_subscription_portal", None)
+
+@st.fragment(run_every=timedelta(seconds=2))
+def _watch_portal():
+    b = st.session_state["portal_wait"]
+    c = tuple(n for _, n, _ in agent.list_llms())
+    if c and c != b:
+        del st.session_state["portal_wait"]
+        st.session_state.pop("sidebar_llm_select", None)
+        st.rerun(scope="app")
+
+if not agent.llmclients and _sp:
+    st.session_state.setdefault("portal_wait", ()); _sp()
+if "portal_wait" in st.session_state: _watch_portal()
+
+if not agent.llmclients:
+    if _sp: st.warning(T("reopen_page"))
+    else: st.error(T("need_mykey"))
+    st.stop()
 
 def build_prompt(objective):
     return f"""读取 {agent.log_path} 尾部，获取 agent 的最新输出。
@@ -84,7 +111,7 @@ def build_prompt(objective):
 def get_controller():
     b = {'ev': threading.Event(), 'obj': '', 'out': None, 'ready': False}
     def loop():
-        ag = GeneraticAgent(); ag.verbose = False; ag.log_path = False
+        ag = GenericAgent(); ag.verbose = False; ag.log_path = False
         threading.Thread(target=ag.run, daemon=True).start()
         while True:
             b['ev'].wait(); b['ev'].clear()
@@ -156,10 +183,6 @@ def render_sidebar():
             st.session_state['_inject_prompt'] = st.session_state.get('loop_prompt_input', '')
             st.toast("🔁 Looping"); st.rerun(scope="app")
     st.divider()
-    if st.button(T('auto_start')):
-        st.session_state.last_reply_time = int(time.time()) - 1800
-        st.session_state.autonomous_enabled = True
-        st.rerun(scope="app")
     if st.session_state.autonomous_enabled:
         if st.button(T('auto_pause')):
             st.session_state.autonomous_enabled = False
@@ -167,9 +190,16 @@ def render_sidebar():
         st.caption(T('auto_on_cap'))
     else:
         if st.button(T('auto_enable'), type="primary"):
+            # 允许 = 约1分钟后首次触发（阈值 1800-60），之后仍按空闲30分钟
+            st.session_state.last_reply_time = int(time.time()) - 1740
             st.session_state.autonomous_enabled = True
             st.toast("✅"); st.rerun(scope="app")
         st.caption(T('auto_off_cap'))
+    if _sp:
+        st.divider()
+        if st.button(T("get_token")):
+            st.session_state.portal_wait = tuple(n for _, n, _ in agent.list_llms())
+            _sp(); st.rerun(scope="app")
 with st.sidebar: render_sidebar()
 
 def fold_turns(text):

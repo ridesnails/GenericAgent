@@ -13,13 +13,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
 
 
-def _project_python():
-    """Return the repository venv interpreter when present."""
-    rel = os.path.join("Scripts", "python.exe") if os.name == "nt" else os.path.join("bin", "python")
-    candidate = os.path.join(PROJECT_DIR, ".venv", rel)
-    return candidate if os.path.exists(candidate) else sys.executable
-
-
 def _frontends():
     return os.path.join(PROJECT_DIR, "frontends")
 
@@ -34,8 +27,6 @@ def launch_frontend(cmd_parts, args=None):
         part = part.replace("{PROJECT_DIR}", PROJECT_DIR)
         part = part.replace("{FRONTENDS}", _frontends())
         part = part.replace("{REFLECT}", _reflect())
-        if part == "{PYTHON}":
-            part = _project_python()
         full_cmd.append(part)
 
     # 插入额外参数
@@ -57,37 +48,37 @@ COMMANDS = {
     "gui": {
         "help": "启动桌面GUI (qtapp)",
         "desc": "启动基于 PyQt5 的完整桌面聊天界面（气泡代码高亮、文件拖拽、历史搜索）",
-        "cmd": ["{PYTHON}", "{FRONTENDS}/qtapp.py"],
+        "cmd": ["python", "{FRONTENDS}/qtapp.py"],
     },
     "configure": {
         "help": "运行初始配置向导 (configure_mykey.py)",
         "desc": "首次安装后配置 API Key、模型参数等基础设置",
-        "cmd": ["{PYTHON}", "{PROJECT_DIR}/assets/configure_mykey.py"],
+        "cmd": ["python", "{PROJECT_DIR}/assets/configure_mykey.py"],
     },
     "hub": {
         "help": "启动 Hub 管理器 (launcher)",
         "desc": "启动 hub 前端管理面板（系统托盘 + 浏览器界面）",
-        "cmd": ["{PYTHON}", "{PROJECT_DIR}/hub.pyw"],
+        "cmd": ["python", "{PROJECT_DIR}/hub.pyw"],
     },
     "tui": {
         "help": "启动终端 TUI (tuiapp)",
         "desc": "启动终端图形界面（Textual），适合纯终端环境或 SSH",
-        "cmd": ["{PYTHON}", "{FRONTENDS}/tuiapp.py"],
+        "cmd": ["python", "{FRONTENDS}/tuiapp.py"],
     },
     "tui2": {
         "help": "启动终端 TUI v2 (tuiapp_v2)",
         "desc": "启动增强版终端图形界面（Textual v2），更多功能更好的体验",
-        "cmd": ["{PYTHON}", "{FRONTENDS}/tuiapp_v2.py"],
+        "cmd": ["python", "{FRONTENDS}/tuiapp_v2.py"],
     },
     "cli": {
         "help": "启动 CLI 对话 (agentmain)",
         "desc": "启动命令行交互对话模式，最轻量的使用方式",
-        "cmd": ["{PYTHON}", "{PROJECT_DIR}/agentmain.py"],
+        "cmd": ["python", "{PROJECT_DIR}/agentmain.py"],
     },
     "launch": {
         "help": "启动 webview 桌面壳 (launch.pyw)",
         "desc": "以原生窗口形式包装 stapp Web 界面（基于 pywebview）",
-        "cmd": ["{PYTHON}", "{PROJECT_DIR}/launch.pyw"],
+        "cmd": ["python", "{PROJECT_DIR}/launch.pyw"],
     },
     "status": {
         "help": "检查运行状态",
